@@ -1,8 +1,12 @@
 /**
+ * External dependencies
+ */
+import { castArray } from 'lodash';
+
+/**
  * WordPress dependencies
  */
-import { createBlock } from '@wordpress/blocks';
-import { dispatch, select } from '@wordpress/data';
+import { dispatch } from '@wordpress/data';
 import { PluginPostPublishPanel } from '@wordpress/edit-post';
 import { external, Icon } from '@wordpress/icons';
 import { __ } from '@wordpress/i18n';
@@ -12,47 +16,46 @@ import { registerPlugin } from '@wordpress/plugins';
  * Internal dependencies
  */
 import { waitForEditor } from '../../shared/wait-for-editor';
+import { basicTemplate, spotifyBadgeTemplate } from './templates';
 
 /**
  * Style dependencies
  */
 import './editor.scss';
 
-async function insertSpotifyBadge() {
-	const { Jetpack_AnchorFm = {} } = window;
-	const { image, spotifyShowUrl } = Jetpack_AnchorFm;
-	if ( ! spotifyShowUrl ) {
-		return;
-	}
-
-	const { track = {} } = Jetpack_AnchorFm;
-
+async function insertTemplate( params ) {
 	await waitForEditor();
 
-	const { insertBlock } = dispatch( 'core/block-editor' );
-	const { editPost } = dispatch( 'core/editor' );
-	const { isEditedPostNew } = select( 'core/editor' );
+	const { insertBlocks } = dispatch( 'core/block-editor' );
 
-	insertBlock(
-		createBlock( 'core/image', {
-			url: image,
-			linkDestination: 'none',
-			href: spotifyShowUrl,
-			align: 'center',
-			width: 165,
-			height: 40,
-			className: 'is-spotify-podcast-badge',
-		} ),
-		0,
-		undefined,
-		false
-	);
+	let templateBlocks;
 
-	// Set the post title when the post is new,
-	// and it can be picked up from the podcast track.
-	if ( isEditedPostNew() && track.title ) {
-		editPost( { title: track.title } );
+	switch ( params.tpl ) {
+		case 'spotifyBadge':
+			templateBlocks = spotifyBadgeTemplate( params );
+		break;
+
+		case 'basicEpisode':
+			templateBlocks = basicTemplate( params );
+		break;
 	}
+
+	if ( templateBlocks?.length ) {
+		insertBlocks(
+			templateBlocks,
+			0,
+			undefined,
+			false
+		);
+	}
+}
+
+async function setEpisodeTitle( { title } ) {
+	if ( ! title ) {
+		return;
+	}
+	await waitForEditor();
+	dispatch( 'core/editor' ).editPost( { title } );
 }
 
 const ConvertToAudio = () => (
@@ -82,14 +85,23 @@ function initAnchor() {
 		return;
 	}
 
-	switch ( data.action ) {
-		case 'insert-spotify-badge':
-			insertSpotifyBadge();
-			break;
-		case 'show-post-publish-outbound-link':
-			showPostPublishOutboundLink();
-			break;
-	}
+	data.actions.forEach( action => {
+		const [ actionName, actionParams ] = castArray( action );
+		switch ( actionName ) {
+			case 'insert-spotify-badge':
+				insertTemplate( { ...actionParams, tpl: 'spotifyBadge' } );
+				break;
+			case 'insert-episode-template':
+				insertTemplate( { ...actionParams, tpl: 'basicEpisode' } );
+				break;
+			case 'show-post-publish-outbound-link':
+				showPostPublishOutboundLink();
+				break;
+			case 'set-episode-title':
+				setEpisodeTitle( actionParams );
+				break;
+		}
+	} );
 }
 
 initAnchor();
