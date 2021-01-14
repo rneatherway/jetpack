@@ -19,4 +19,13 @@ module.exports = [
 			filename: 'intersectionobserver-polyfill.min.js',
 		},
 	},
+	{
+		mode: 'production',
+		context: path.resolve( __dirname, 'packages/jitm/assets' ),
+		entry: './jetpack-jitm.js',
+		output: {
+			path: path.resolve( __dirname, 'packages/jitm/assets' ),
+			filename: 'jetpack-jitm.min.js',
+		},
+	},
 ];
